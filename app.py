@@ -3,6 +3,9 @@ import os
 import requests
 import time
 
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+
 from config import *
 
 def carClassifier(frame, classifier, scaleFactor, minNeighbors, flags=0):
@@ -13,7 +16,6 @@ def carClassifier(frame, classifier, scaleFactor, minNeighbors, flags=0):
 def carDetection(image, cars):
 
     #cars = [item for item in detection if item['item'] == 'car']
-    print(cars)
     if len(cars)>0:
         print(cars)
         cv2.imwrite('output.jpg', image)
@@ -30,23 +32,31 @@ def carDetection(image, cars):
 
 ##################################################################################################
 if __name__ == '__main__':
-    cap = cv2.VideoCapture(0)
-
+    # initialize the camera and grab a reference to the raw camera capture
+    camera = PiCamera()
+    #camera.resolution = (640, 480)
+    camera.framerate = 32
+    #rawCapture = PiRGBArray(camera, size=(640, 480))
+    rawCapture = PiRGBArray(camera)
+    
     classifier = cv2.CascadeClassifier(os.path.join(CLASSIFIER_PATH,'cars.xml'))
-
-    while True:
-        ret, frames = cap.read()
-        cars = carClassifier(frames, classifier.detectMultiScale, 1.1, 1)
-        carDetection(frames, cars)
-        for (x,y,w,h) in cars:
-            cv2.rectangle(frames,(x,y),(x+w,y+h),(0,0,255),2)
-
-        # Display frames in a window
-        cv2.imshow('video', frames)
-
-        # Wait for Esc key to stop
-        if cv2.waitKey(33) == 27:
-            break
-
-    # De-allocate any associated memory usage
-    cv2.destroyAllWindows()
+    # allow the camera to warmup
+    time.sleep(0.1)
+     
+    # capture frames from the camera
+    for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+            # grab the raw NumPy array representing the image, then initialize the timestamp
+            # and occupied/unoccupied text
+            image = frame.array
+            #cv2.imshow("Frame", image)
+            cars = carClassifier(image, classifier.detectMultiScale, 1.1, 1)
+            carDetection(image, cars)
+            # show the frame
+            
+            # clear the stream in preparation for the next frame
+            rawCapture.truncate(0)
+            
+            #key = cv2.waitKey(1) & 0xFF
+            # if the `q` key was pressed, break from the loop
+            #if key == ord("q"):
+            #    break
